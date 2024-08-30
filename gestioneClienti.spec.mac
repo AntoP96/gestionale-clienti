@@ -1,0 +1,51 @@
+# -*- mode: python ; coding: utf-8 -*-
+
+from PyInstaller.utils.hooks import collect_data_files
+
+a = Analysis(
+    ['gestioneClienti.py'],
+    pathex=['/Users/studente/gestionale-clienti'],
+    binaries=[],
+    datas=[
+        ('/Users/studente/gestionale-clienti/icon.icns', 'icon.icns'),
+        ('/Users/studente/gestionale-clienti/config.txt', '.'),
+        ('/Users/studente/gestionale-clienti/bg.png', '.'),
+    ],
+    hiddenimports=[],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    noarchive=False,
+    optimize=0,
+)
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.datas,
+    [],
+    name='Gestionale Clienti',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,  # Considera di disabilitare UPX su macOS
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=False,
+    icon='icon.icns',
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,  # Aggiungi l'identità di code signing se necessaria
+    entitlements_file=None,  # Aggiungi il file di entitlements se necessario
+)
+
+app = BUNDLE(
+    exe,
+    name='gestioneClienti.app',
+    icon='icon.icns',
+    bundle_identifier=None,
+)
