@@ -1,84 +1,84 @@
-# Gestionale Clienti
+# Customer Management System
 
-**Gestionale Clienti** è un'applicazione di gestione clienti sviluppata in Python utilizzando PyQt5 e pyodbc. L'applicazione consente di gestire i dati dei clienti tramite un'interfaccia utente grafica e un database Microsoft Access.
+**Customer Management System** is a client management application developed in Python using PyQt5 and pyodbc. The application allows you to manage client data through a graphical user interface and a Microsoft Access database.
 
-## Requisiti
+## Requirements
 
 - Python 3.x
-- PyQt5
+- PyQt6
 - pyodbc
 - Microsoft Access Driver (*.mdb, *.accdb)
 
-## Installazione
+## Installation
 
-1. **Clona il repository**:
+1. **Clone the repository**:
 
     ```bash
     git clone https://github.com/AntoP96/gestionale-clienti
     ```
 
-2. **Naviga nella directory del progetto**:
+2. **Navigate to the project directory**:
 
     ```bash
     cd gestionale-clienti
     ```
 
-3. **Installa le dipendenze**:
+3. **Install dependencies**:
 
     ```bash
     pip install -r requirements.txt
     ```
 
-    Assicurati di avere Microsoft Access Driver installato sul tuo sistema.
+    Make sure you have the Microsoft Access Driver installed on your system.
 
-4. **Configura il file `config.txt`**:
+4. **Configure the `config.txt` file**:
 
-    Modifica il file `config.txt` per specificare il percorso del tuo database Access. Esempio di contenuto:
+    Edit the `config.txt` file to specify the path to your Access database. Example content:
 
     ```
-    C:\percorso\al\tuo\database.accdb
+    C:\path\to\your\database.accdb
     ```
 
-## Utilizzo
+## Usage
 
-1. **Avvia l'applicazione**:
+1. **Run the application**:
 
-    Esegui il file Python principale `gestioneClienti.py`:
+    Execute the main Python file `gestioneClienti.py`:
 
     ```bash
     python gestioneClienti.py
     ```
 
-2. **Interfaccia Utente**:
+2. **User Interface**:
 
-    - **Login**: Inserisci il nome utente e la password per accedere all'applicazione.
-    - **Home Page**: Cerca un cliente esistente o crea un nuovo cliente.
-    - **Customer Page**: Visualizza e modifica i dati del cliente selezionato.
+    - **Login**: Enter the username and password to access the application.
+    - **Home Page**: Search for an existing client or create a new one.
+    - **Customer Page**: View and edit the selected client’s data.
 
-3. **Costruzione dell'applicazione (opzionale)**:
+3. **Building the application (optional)**:
 
-    Se desideri creare un eseguibile standalone, puoi utilizzare PyInstaller:
-
-    ```bash
-    python -m PyInstaller --name "Gestionale Clienti" --onefile gestioneClienti.py
-    ```
-
-    Modifica il file `.spec` per inserire i file esterni se necessario e poi esegui (come nel file `Gestionale Clienti.spec.example`)
-
-    Builda l'applicazione completa:
+    If you want to create a standalone executable, you can use PyInstaller:
 
     ```bash
-    python -m PyInstaller "Gestionale Clienti.spec"
+    python -m PyInstaller --name "Customer Management System" --onefile gestioneClienti.py
     ```
 
-## Contributi
+    Modify the `.spec` file to include external files if necessary, then run (as shown in the `Customer Management System.spec.example` file).
 
-I contributi sono benvenuti! Se hai suggerimenti o migliorie, sentiti libero di aprire una *pull request* o di segnalare un problema.
+    Build the complete application:
 
-## Licenza
+    ```bash
+    python -m PyInstaller "Customer Management System.spec"
+    ```
 
-Questo progetto è concesso in licenza sotto la Licenza MIT - vedi il file [LICENSE](LICENSE) per i dettagli.
+## Contributions
 
-## Contatti
+Contributions are welcome! If you have suggestions or improvements, feel free to open a pull request or report an issue.
 
-Per supporto o domande, contattami a: [apaolino96@gmail.com](mailto:apaolino96@gmail.com)
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Contact
+
+For support or questions, contact me at: [apaolino96@gmail.com](mailto:apaolino96@gmail.com)

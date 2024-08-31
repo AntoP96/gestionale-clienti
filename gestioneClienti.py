@@ -1,14 +1,14 @@
 import sys
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from PyQt5.QtCore import *
+from PyQt6.QtWidgets import *
+from PyQt6.QtGui import *
+from PyQt6.QtCore import *
 import pyodbc
 from datetime import datetime
 import os
 
 def resource_path(relative_path):
     """ Get the absolute path to a resource, works for dev and for PyInstaller """
-    if getattr(sys, 'frozen', False):  # PyInstaller creates a temp folder and stores path in _MEIPASS
+    if getattr(sys, 'frozen', False):
         base_path = sys._MEIPASS
     else:
         base_path = os.path.dirname(__file__)
@@ -28,76 +28,102 @@ def connect_db():
 
 # Funzione per caricare i dati di un cliente
 def load_customer_data(customer_name):
-    conn = connect_db()
+    conn = connect_db()  # Ensure you have a valid connection function
     cursor = conn.cursor()
 
     try:
         query = f"SELECT * FROM [{customer_name}]"
         cursor.execute(query)
-        data = cursor.fetchall()
-        conn.close()
-        
+        data = cursor.fetchall()  # Fetch data while the connection is open
+
         formatted_data = []
         for row in data:
             formatted_row = list(row)
-            if isinstance(row[1], datetime):
-                formatted_row[1] = row[1].strftime("%Y-%m-%d")
+            # Check if the date value is not None
+            date_value = row[1]  # Assuming the date is in the second column (index 1)
+            if date_value is not None:
+                # Convert the date to d-m-y format if it's in y-m-d
+                if isinstance(date_value, datetime):
+                    formatted_row[1] = date_value.strftime("%d-%m-%y")
+                else:
+                    # Try to convert the date if it's in string format
+                    try:
+                        date_obj = datetime.strptime(date_value, "%Y-%m-%d")
+                        formatted_row[1] = date_obj.strftime("%d-%m-%y")
+                    except ValueError:
+                        # If the date is in d-m-y
+                        try:
+                            date_obj = datetime.strptime(date_value, "%d-%m-%y")
+                            formatted_row[1] = date_obj.strftime("%d-%m-%y")
+                        except ValueError:
+                            formatted_row[1] = None  # Handle invalid date formats
+            else:
+                formatted_row[1] = None  # Set to None if the original date was None
+
             formatted_data.append(formatted_row)
-        
+
         return formatted_data
     except Exception as e:
-        conn.close()
-        # QMessageBox.critical(None, "Errore", f"Impossibile trovare il cliente: {customer_name}.")
+        print(f"Errore durante il caricamento dei dati del cliente: {e}")
         return None
+    finally:
+        conn.close()
 
 def save_customer_data(customer_name, data, deleted_row_ids):
-    conn = connect_db()
+    conn = connect_db()  # Ottieni la connessione al database
     cursor = conn.cursor()
 
     try:
-        # Ottieni gli ID esistenti per evitare conflitti e duplicati
+        # Ottieni gli ID esistenti per evitare conflitti
         cursor.execute(f"SELECT ID FROM [{customer_name}]")
         existing_ids = {row[0] for row in cursor.fetchall()}
 
         # Costruisci l'elenco di ID da eliminare
-        ids_to_delete = list(deleted_row_ids)  # Righe eliminate
-        ids_to_delete.extend([row[0] for row in data if row[0] in existing_ids])
+        ids_to_delete = set(deleted_row_ids)  # Usa un set per evitare duplicati
+        ids_to_delete.update(row[0] for row in data if row[0] in existing_ids and all(cell is None or cell == '' for cell in row))
 
-        # Rimuovi le righe esistenti che devono essere aggiornate o eliminate
+        # Converti gli ID a interi e costruisci la query di eliminazione
+        ids_to_delete = {int(id_) for id_ in ids_to_delete if id_ is not None and id_.isdigit()}
+
         if ids_to_delete:
-            ids_to_delete_str = ', '.join(map(str, ids_to_delete))
+            ids_to_delete_str = ', '.join(map(str, ids_to_delete))  # Converti in stringa per la query
             cursor.execute(f"DELETE FROM [{customer_name}] WHERE ID IN ({ids_to_delete_str})")
 
         # Inserisci i nuovi dati
         for row in data:
-            row_id = row[0]  # ID della riga
+            if all(cell is None or cell == '' for cell in row):
+                continue  # Salta le righe vuote
+            
+            row_id = row[0] if row[0] else None  # ID della riga
             date_value = row[1]
             if date_value:
+                # Converti la data solo se è in formato d-m-y
                 try:
-                    date_value = datetime.strptime(date_value, "%Y-%m-%d")
+                    date_obj = datetime.strptime(date_value, "%d-%m-%y")
+                    date_value = date_obj.strftime("%Y-%m-%d")
                 except ValueError:
-                    date_value = None
+                    # Se non è in d-m-y, mantieni il valore originale (presumibilmente y-m-d)
+                    pass
+            
             numero_fattura_value = row[2] if row[2] else None
             dare_value = float(row[3]) if row[3] else 0.0
             avere_value = float(row[4]) if row[4] else 0.0
             totale_value = float(row[5]) if row[5] else 0.0
             note_value = row[6] if row[6] else None
-
-            if row_id:  # Se l'ID esiste, esegui un aggiornamento
+            if row_id:  # Aggiorna se l'ID esiste
                 query = f"""
                     UPDATE [{customer_name}]
                     SET [DATA] = ?, [NUMERO FATTURA] = ?, [DARE] = ?, [AVERE] = ?, [TOTALE] = ?, [NOTE] = ?
                     WHERE ID = ?
                 """
                 cursor.execute(query, (date_value, numero_fattura_value, dare_value, avere_value, totale_value, note_value, row_id))
-            else:  # Altrimenti, inserisci una nuova riga
+            else:  # Inserisci una nuova riga
                 query = f"""
                     INSERT INTO [{customer_name}] 
                     ([DATA], [NUMERO FATTURA], [DARE], [AVERE], [TOTALE], [NOTE])  
                     VALUES (?, ?, ?, ?, ?, ?)
                 """
                 cursor.execute(query, (date_value, numero_fattura_value, dare_value, avere_value, totale_value, note_value))
-
         # Commetti le modifiche
         conn.commit()
     except Exception as e:
@@ -167,12 +193,12 @@ class LoginWindow(QWidget):
         input_layout.addWidget(self.username_input)
         input_layout.addWidget(QLabel("Password:"))
         self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         input_layout.addWidget(self.password_input)
         self.login_button = QPushButton("Accedi")
         self.login_button.clicked.connect(self.check_login)
         input_layout.addWidget(self.login_button)
-        input_layout.setAlignment(Qt.AlignCenter)
+        input_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         container_widget = QWidget(self)
         container_widget.setLayout(input_layout)
@@ -207,7 +233,7 @@ class CustomerPage(QWidget):
         layout = QVBoxLayout()
 
         # Tabella principale
-        self.table = QTableWidget(0, 7)  # 6 colonne
+        self.table = QTableWidget(0, 7)  # 7 colonne
         headers = ["ID", "DATA", "NUMERO FATTURA", "DARE", "AVERE", "TOTALE", "NOTE"]
         self.table.setHorizontalHeaderLabels(headers)
 
@@ -218,14 +244,17 @@ class CustomerPage(QWidget):
         header_font = QFont()
         header_font.setBold(True)
         header_view = self.table.horizontalHeader()
-        header_view.setStyleSheet("font-weight: bold;")  # Imposta il font in grassetto usando lo stylesheet
+        header_view.setStyleSheet("font-weight: bold;")
 
         # Allarga la colonna "NUMERO FATTURA"
+        self.table.setColumnWidth(1, 150)
         self.table.setColumnWidth(2, 150)
 
         # Estende l'ultima sezione per riempire la larghezza della tabella
         header_view.setStretchLastSection(True)
-        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+
+        # Imposta la politica del menu contestuale
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
 
         # Applicazione del delegate alla colonna della data
@@ -287,7 +316,7 @@ class CustomerPage(QWidget):
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
-        self.apply_dark_theme()  # Applica il tema scuro
+        self.apply_theme()
 
         # Connetti le modifiche della tabella ai calcoli totali
         self.table.itemChanged.connect(self.on_item_changed)
@@ -295,22 +324,20 @@ class CustomerPage(QWidget):
         # Imposta i validatori per le colonne Dare e Avere
         self.dare_validator = QDoubleValidator(0.0, 1e6, 2)
         self.avere_validator = QDoubleValidator(0.0, 1e6, 2)
+        
+        # Impostazioni specifiche per macOS per garantire la visibilità del menu
+        self.ensure_menu_visibility_mac()
 
-    def apply_dark_theme(self):
+    def ensure_menu_visibility_mac(self):
+        if sys.platform == 'darwin':  # Check if the platform is macOS
+            self.setWindowFlags(Qt.WindowType.MacWindowToolBarButtonHint | Qt.WindowType.Window)
+
+    def apply_theme(self):
         # Applica il tema scuro alla tabella
         table_style = """
-            QTableWidget {
-                background-color: #333;
-                color: #fff;
-            }
-            QHeaderView::section {
-                background-color: #444;
-                color: #fff;
-                padding: 4px;
-                border: 1px solid #555;
-            }
-            QTableWidget::item {
-                border: 1px solid #555;
+            QTableWidget::item:selected {
+                background-color: #d0d0d0; 
+                color : #000000;
             }
         """
         self.table.setStyleSheet(table_style)
@@ -328,11 +355,11 @@ class CustomerPage(QWidget):
                     item = QTableWidgetItem(item_text)
                     
                     if col_index == 0:  # ID column
-                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     elif col_index in [3, 4, 5]:  # DARE and AVERE columns
                         item.setText(self.format_number(float(cell_data)) if cell_data else "0.00")
                     if col_index == 5:  # TOTALE column
-                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     self.table.setItem(row_position, col_index, item)
             self.calculate_totals()
@@ -358,9 +385,12 @@ class CustomerPage(QWidget):
 
     def on_item_changed(self, item):
         if item.column() in [3, 4]:  # Colonne Dare e Avere
-            item.setText(self.format_number(float(item.text())) if item.text() else "0.00")
-            self.calculate_row_total(item.row())
-            self.calculate_totals()
+            try:
+                item.setText(self.format_number(float(item.text())) if item.text() else "0.00")
+                self.calculate_row_total(item.row())
+                self.calculate_totals()
+            except ValueError:
+                item.setText("0.00")  # Imposta a zero se il valore non è valido
 
     def calculate_row_total(self, row):
         dare_item = self.table.item(row, 3)
@@ -371,8 +401,11 @@ class CustomerPage(QWidget):
         totale_value = round(dare_value - avere_value, 2)
 
         totale_item = QTableWidgetItem(self.format_number(totale_value))
-        totale_item.setFlags(totale_item.flags() & ~Qt.ItemIsEditable)
+        totale_item.setFlags(totale_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self.table.setItem(row, 5, totale_item)
+
+        # Aggiorna il colore di sfondo della riga
+        self.update_row_background_color(row)
 
     def calculate_totals(self):
         self.total_dare_value = 0
@@ -391,6 +424,9 @@ class CustomerPage(QWidget):
         self.total_dare.setText(f"{self.format_number(self.total_dare_value)} €")
         self.total_avere.setText(f"{self.format_number(self.total_avere_value)} €")
         self.total_totale.setText(f"{self.format_number(self.total_totale_value)} €")
+
+        # Aggiorna il colore di sfondo di tutte le righe
+        self.update_all_rows_background_color()
 
     def format_number(self, value):
         return f"{value:.2f}"
@@ -412,7 +448,7 @@ class CustomerPage(QWidget):
         menu.addAction(add_below_action)
         menu.addAction(delete_action)
 
-        menu.exec_(self.table.viewport().mapToGlobal(pos))
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
     def add_row_above(self):
         current_row = self.table.currentRow()
@@ -436,14 +472,40 @@ class CustomerPage(QWidget):
     def set_current_row(self, row):
         self.table.setCurrentCell(row, 0)
 
+    def set_row_background_color(self, row, color):
+        for col in range(self.table.columnCount()):
+            item = self.table.item(row, col)
+            if item:
+                item.setBackground(color)
+
+    def update_row_background_color(self, row):
+        totale_item = self.table.item(row, 5)
+        totale_value = float(totale_item.text()) if totale_item and totale_item.text() else 0
+        
+        # Applica il colore solo alla cella "Totale"
+        if totale_item:  # Verifica se l'item della colonna "Totale" esiste
+            row_color = QColor(255, 0, 0) if totale_value < 0 else QColor(255, 255, 255)
+            totale_item.setBackground(row_color)  # Imposta il colore solo per la cella "Totale"
+        else:
+            # Se non esiste, puoi impostare un colore di default (opzionale)
+            totale_item.setBackground(QColor(255, 255, 255))
+
+        self.table.viewport().update()
+        self.table.update()
+        self.repaint()
+
+    def update_all_rows_background_color(self):
+        for row in range(self.table.rowCount()):
+            self.update_row_background_color(row)
+
 class HomePage(QWidget):
     def __init__(self):
         super().__init__()
         self.setup_ui()
-        
+
     def setup_ui(self):
         layout = QVBoxLayout()
-        
+
         # Aggiungi un'immagine di sfondo
         self.image_label = QLabel(self)
         pixmap = QPixmap(resource_path("bg.png"))
@@ -451,7 +513,7 @@ class HomePage(QWidget):
         self.image_label.setScaledContents(True)
         self.image_label.setGeometry(0, 0, self.width(), self.height())
         layout.addWidget(self.image_label)
-        
+
         # Elementi dell'interfaccia utente
         input_layout = QVBoxLayout()
         self.customer_name_input = QLineEdit()
@@ -463,14 +525,14 @@ class HomePage(QWidget):
         self.new_button.clicked.connect(self.new_customer)
         input_layout.addWidget(self.search_button)
         input_layout.addWidget(self.new_button)
-        input_layout.setAlignment(Qt.AlignCenter)  # Centra gli elementi
+        input_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centra gli elementi
 
         container_widget = QWidget(self)
         container_widget.setLayout(input_layout)
         container_widget.setGeometry(10, self.height() - 150, self.width() - 20, 140)  # Posiziona il layout in basso
         layout.addWidget(container_widget)
         self.setLayout(layout)
-    
+
     def resizeEvent(self, event):
         self.image_label.setGeometry(0, 0, self.width(), self.height())
 
@@ -511,22 +573,50 @@ class DateDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
         editor = QDateEdit(parent)
         editor.setCalendarPopup(True)
-        editor.setDisplayFormat("yyyy-MM-dd")
+        editor.setDisplayFormat("dd-MM-yyyy")
+        
+        # Imposta lo stylesheet per il calendario
+        editor.setStyleSheet("""
+            QDateEdit {
+                background-color: #FFFFFF;
+                color: #000000;
+            }
+            QCalendarWidget {
+                background-color: #FFFFFF;
+                color: #000000;
+            }
+            QCalendarWidget QAbstractItemView {
+                background-color: #FFFFFF;
+                color: #000000;
+            }
+            QCalendarWidget QAbstractItemView::item {
+                background-color: #FFFFFF;
+                color: #000000;
+            }
+            QCalendarWidget QAbstractItemView::item:selected {
+                background-color: #B0E0E6;
+                color: #000000;
+            }
+            QCalendarWidget QAbstractItemView::item:hover {
+                background-color: #D3D3D3;
+            }
+        """)
+        
         return editor
 
     def setEditorData(self, editor, index):
-        date_str = index.model().data(index, Qt.EditRole)
+        date_str = index.model().data(index, Qt.ItemDataRole.EditRole)
         if date_str:
             try:
-                date = QDate.fromString(date_str, "yyyy-MM-dd")
+                date = QDate.fromString(date_str, "dd-MM-yyyy")
                 editor.setDate(date)
-            except:
+            except Exception:
                 editor.setDate(QDate.currentDate())
         else:
             editor.setDate(QDate.currentDate())
     
     def setModelData(self, editor, model, index):
-        model.setData(index, editor.date().toString("yyyy-MM-dd"), Qt.EditRole)
+        model.setData(index, editor.date().toString("dd-MM-yyyy"), Qt.ItemDataRole.EditRole)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -551,7 +641,7 @@ class MainWindow(QMainWindow):
         self.central_widget.addWidget(self.login_page)
         self.central_widget.addWidget(self.home_page)
         self.central_widget.addWidget(self.customer_page)
-        self.central_widget.addWidget(self.settings_page)  # Aggiungi la pagina delle impostazioni
+        self.central_widget.addWidget(self.settings_page)
 
         # Mostra la pagina di login all'avvio
         self.central_widget.setCurrentIndex(0)
@@ -559,9 +649,8 @@ class MainWindow(QMainWindow):
         # Menu principale
         self.create_menu()
 
-        # Applicazione del tema scuro
-        self.apply_dark_theme()
-        
+        # Apply the theme
+        self.apply_theme()
 
     def create_menu(self):
         """ Crea la barra di menu principale """
@@ -589,59 +678,52 @@ class MainWindow(QMainWindow):
         self.home_action.setEnabled(False)
         self.settings_action.setVisible(True)
 
-    def apply_dark_theme(self):
-        """ Applica un tema scuro con colori più vivaci """
-        dark_style_sheet = """
+    def apply_theme(self):
+        """Apply a light theme with vibrant colors"""
+        style_sheet = """
             QWidget {
-                background-color: #2E2E2E;
-                color: #E0E0E0;
+                background-color: #F5F5F5;
+                color: #333333;
                 font-size: 14px;
             }
             QPushButton {
-                background-color: #3D3D3D;
-                color: #FFFFFF;
+                background-color: #E0E0E0;
+                color: #333333;
                 border-radius: 5px;
                 padding: 8px;
             }
             QPushButton:hover {
-                background-color: #4A4A4A;
+                background-color: #D0D0D0;
             }
             QLineEdit {
-                background-color: #3C3C3C;
-                color: #FFFFFF;
-                border: 1px solid #555555;
+                background-color: #FFFFFF;
+                color: #333333;
+                border: 1px solid #CCCCCC;
                 border-radius: 5px;
                 padding: 8px;
             }
             QLabel {
-                color: #E0E0E0;
+                color: #333333;
             }
             QMenuBar {
-                background-color: #3C3C3C;
-                color: #E0E0E0;
+                background-color: #E0E0E0;
+                color: #333333;
             }
             QMenuBar::item {
-                background-color: #3C3C3C;
-                color: #E0E0E0;
+                background-color: #E0E0E0;
+                color: #333333;
             }
-            QMenuBar::item::selected {
-                background-color: #4A4A4A;
-            }
-            QTableWidget {
-                background-color: #2E2E2E;
-                color: #E0E0E0;
-            }
-            QTableWidget::item {
-                border: 1px solid #555555;
+            QMenuBar::item:selected {
+                background-color: #D0D0D0;
             }
             QHeaderView::section {
-                background-color: #3C3C3C;
-                color: #E0E0E0;
+                background-color: #E0E0E0;
+                color: #333333;
                 padding: 4px;
-                border: 1px solid #555555;
+                border: 1px solid #CCCCCC;
             }
         """
-        self.setStyleSheet(dark_style_sheet)
+        self.setStyleSheet(style_sheet)
 
     def go_to_home(self):
         """ Torna alla pagina Home """
@@ -701,7 +783,7 @@ class SettingsPage(QWidget):
         self.back_button.clicked.connect(self.go_back)
         layout.addWidget(self.back_button)
 
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.setLayout(layout)
         
@@ -713,7 +795,7 @@ class SettingsPage(QWidget):
                 file.write(new_path.strip())
                 print(f"Percorso salvato: {new_path.strip()}")
         except Exception as e:
-            QMessageBox.critical(None, "Errore", f"Errore durante il salvataggio del percorso del file: {str(e)}")
+            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio del percorso del file: {str(e)}")
 
     def load_db_path(self):
         """ Carica il percorso del file di database dal file di configurazione """
@@ -727,25 +809,14 @@ class SettingsPage(QWidget):
                     print(f"Percorso caricato: {db_path}")
                     self.path_input.setText(db_path)
             except Exception as e:
-                QMessageBox.critical(None, "Errore", f"Errore durante il caricamento del percorso del file: {str(e)}")
+                QMessageBox.critical(self, "Errore", f"Errore durante il caricamento del percorso del file: {str(e)}")
         else:
-            QMessageBox.warning(None, "Attenzione", "File di configurazione non trovato.")
+            QMessageBox.warning(self, "Attenzione", "File di configurazione non trovato.")
 
     def browse_file(self):
         """ Permette all'utente di selezionare un nuovo file Access """
         file_dialog = QFileDialog(self, "Seleziona File Access", "", "Access Database (*.accdb)")
-        if file_dialog.exec_():
-            selected_file = file_dialog.selectedFiles()[0]
-            self.path_.setText(selected_file)
-
-    def go_back(self):
-        """ Torna alla pagina di login """
-        self.parent().setCurrentIndex(0)
-
-    def browse_file(self):
-        """ Permette all'utente di selezionare un nuovo file Access """
-        file_dialog = QFileDialog(self, "Seleziona File Access", "", "Access Database (*.accdb)")
-        if file_dialog.exec_():
+        if file_dialog.exec():
             selected_file = file_dialog.selectedFiles()[0]
             self.path_input.setText(selected_file)
 
@@ -757,4 +828,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
