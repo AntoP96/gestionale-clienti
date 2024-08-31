@@ -330,6 +330,7 @@ class CustomerPage(QWidget):
 
     def ensure_menu_visibility_mac(self):
         if sys.platform == 'darwin':  # Verifica se la piattaforma è macOS
+            print("Applying macOS-specific menu visibility settings...")
             # Imposta le flag di finestra per garantire la visibilità della barra degli strumenti
             self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.WindowSystemMenuHint)
             
