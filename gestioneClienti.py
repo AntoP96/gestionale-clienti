@@ -2,7 +2,7 @@ import sys
 from PyQt6.QtWidgets import *
 from PyQt6.QtGui import *
 from PyQt6.QtCore import *
-import pyodbc
+import sqlite3
 from datetime import datetime
 import os
 
@@ -20,9 +20,10 @@ CONFIG_FILE = resource_path("config.txt")
 # Connessione al database Access
 def connect_db():
     try:
-        conn_str = f'DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={db_path};'
-        return pyodbc.connect(conn_str)
-    except pyodbc.Error as e:
+        # Connessione al database SQLite
+        conn = sqlite3.connect(db_path)
+        return conn
+    except sqlite3.Error as e:
         QMessageBox.critical(None, "Errore di Connessione", f"Errore durante la connessione al database: {str(e)}")
         return None
 
@@ -39,29 +40,32 @@ def load_customer_data(customer_name):
         formatted_data = []
         for row in data:
             formatted_row = list(row)
-            # Check if the date value is not None
+            # Check if the date value is not None and is in the second column (index 1)
             date_value = row[1]  # Assuming the date is in the second column (index 1)
-            if date_value is not None:
-                # Convert the date to d-m-y format if it's in y-m-d
+            if date_value:
+                # Check if date_value is a datetime object or a string
                 if isinstance(date_value, datetime):
                     formatted_row[1] = date_value.strftime("%d-%m-%Y")
                 else:
                     # Try to convert the date if it's in string format
                     try:
-                        date_obj = datetime.strptime(date_value, "%Y-%m-%d")
+                        # Handle common date formats
+                        date_obj = datetime.strptime(date_value, "%Y-%m-%d %H:%M:%S.%f")
                         formatted_row[1] = date_obj.strftime("%d-%m-%Y")
                     except ValueError:
-                        # If the date is in d-m-y
                         try:
-                            date_obj = datetime.strptime(date_value, "%d-%m-%Y")
+                            date_obj = datetime.strptime(date_value, "%Y-%m-%d")
                             formatted_row[1] = date_obj.strftime("%d-%m-%Y")
                         except ValueError:
-                            formatted_row[1] = None  # Handle invalid date formats
+                            try:
+                                date_obj = datetime.strptime(date_value, "%d-%m-%Y")
+                                formatted_row[1] = date_obj.strftime("%d-%m-%Y")
+                            except ValueError:
+                                formatted_row[1] = date_value  # Keep the original value if not convertible
             else:
                 formatted_row[1] = None  # Set to None if the original date was None
 
-            formatted_data.append(formatted_row)
-
+            formatted_data.append(tuple(formatted_row))  # Convert the list back to a tuple
         return formatted_data
     except Exception as e:
         print(f"Errore durante il caricamento dei dati del cliente: {e}")
@@ -74,77 +78,90 @@ def save_customer_data(customer_name, data, deleted_row_ids):
     cursor = conn.cursor()
 
     try:
-        # Ottieni gli ID esistenti per evitare conflitti
+        # Ottieni gli ID esistenti nel database
         cursor.execute(f"SELECT ID FROM [{customer_name}]")
-        existing_ids = {row[0] for row in cursor.fetchall()}
+        existing_ids = {str(row[0]) for row in cursor.fetchall()}  # Assicurati che siano stringhe per il confronto
 
-        # Costruisci l'elenco di ID da eliminare
-        ids_to_delete = set(deleted_row_ids)  # Usa un set per evitare duplicati
-        ids_to_delete.update(row[0] for row in data if row[0] in existing_ids and all(cell is None or cell == '' for cell in row))
+        # Costruisci l'elenco di ID da eliminare, assicurandoti che gli ID siano nel set esistente
+        ids_to_delete = {str(id_) for id_ in deleted_row_ids if id_ in existing_ids}
 
-        # Converti gli ID a interi e costruisci la query di eliminazione
-        ids_to_delete = {int(id_) for id_ in ids_to_delete if id_ is not None and id_.isdigit()}
+        # Elimina anche le righe vuote (dove tutte le celle sono None o vuote)
+        for row in data:
+            row_id = str(row[0]) if row[0] else None
+            if row_id in existing_ids and all(cell is None or cell == '' for cell in row):
+                ids_to_delete.add(row_id)
 
+        # Esegui la query di eliminazione se ci sono ID da eliminare
         if ids_to_delete:
-            ids_to_delete_str = ', '.join(map(str, ids_to_delete))  # Converti in stringa per la query
+            ids_to_delete_str = ', '.join(map(str, ids_to_delete))
+            # print(f"DELETE FROM [{customer_name}] WHERE ID IN ({ids_to_delete_str})")
             cursor.execute(f"DELETE FROM [{customer_name}] WHERE ID IN ({ids_to_delete_str})")
 
-        # Inserisci i nuovi dati
+        # Inserisci o aggiorna i dati esistenti
         for row in data:
             if all(cell is None or cell == '' for cell in row):
-                continue  # Salta le righe vuote
-            
-            row_id = row[0] if row[0] else None  # ID della riga
+                continue  # Salta le righe completamente vuote
+
+            row_id = row[0] if row[0] else None  # Ottieni l'ID della riga
             date_value = row[1]
             if date_value:
-                # Converti la data solo se è in formato d-m-y
                 try:
                     date_obj = datetime.strptime(date_value, "%d-%m-%y")
                     date_value = date_obj.strftime("%Y-%m-%d")
                 except ValueError:
-                    # Se non è in d-m-y, mantieni il valore originale (presumibilmente y-m-d)
-                    pass
-            
+                    pass  # Mantieni il valore originale
+
             numero_fattura_value = row[2] if row[2] else None
             dare_value = float(row[3]) if row[3] else 0.0
             avere_value = float(row[4]) if row[4] else 0.0
             totale_value = float(row[5]) if row[5] else 0.0
             note_value = row[6] if row[6] else None
-            if row_id:  # Aggiorna se l'ID esiste
+
+            if row_id and row_id in existing_ids:  # Aggiorna se l'ID esiste
                 query = f"""
                     UPDATE [{customer_name}]
                     SET [DATA] = ?, [NUMERO FATTURA] = ?, [DARE] = ?, [AVERE] = ?, [TOTALE] = ?, [NOTE] = ?
                     WHERE ID = ?
                 """
                 cursor.execute(query, (date_value, numero_fattura_value, dare_value, avere_value, totale_value, note_value, row_id))
-            else:  # Inserisci una nuova riga
+            elif row_id is None:  # Inserisci una nuova riga solo se l'ID è None
                 query = f"""
                     INSERT INTO [{customer_name}] 
                     ([DATA], [NUMERO FATTURA], [DARE], [AVERE], [TOTALE], [NOTE])  
                     VALUES (?, ?, ?, ?, ?, ?)
                 """
+                # print((query, (date_value, numero_fattura_value, dare_value, avere_value, totale_value, note_value)))
                 cursor.execute(query, (date_value, numero_fattura_value, dare_value, avere_value, totale_value, note_value))
+
         # Commetti le modifiche
         conn.commit()
+
     except Exception as e:
         print(f"Errore durante l'inserimento dei dati: {e}")
+        conn.rollback()  # Annulla le modifiche in caso di errore
     finally:
         QMessageBox.information(None, "Successo", f"Dati del cliente {customer_name} salvati con successo.")
         conn.close()
 
 # Funzione per verificare se il nome del cliente è unico
 def is_customer_name_unique(customer_name):
-    conn = connect_db()
+    conn = connect_db()  # Ottieni la connessione al database
     cursor = conn.cursor()
     
     try:
-        # Prova a eseguire una query sulla tabella specifica
-        cursor.execute(f"SELECT 1 FROM [{customer_name}] WHERE 1=0")
+        # Esegui una query per verificare se la tabella esiste
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (customer_name,))
+        
+        # Se troviamo un risultato, la tabella esiste già
+        if cursor.fetchone() is not None:
+            return False  # La tabella esiste già
+        else:
+            return True  # La tabella non esiste, quindi il nome è unico
+    except sqlite3.Error as e:
+        print(f"Errore durante la verifica della tabella: {e}")
+        return False  # In caso di errore, supponiamo che la tabella non sia unica
+    finally:
         conn.close()
-        return False  # La tabella esiste già
-    except pyodbc.Error:
-        conn.close()
-        return True  # La tabella non esiste, quindi il nome è unico
 
 # Funzione per creare una nuova tabella cliente
 def create_new_customer(customer_name):
@@ -152,24 +169,26 @@ def create_new_customer(customer_name):
     cursor = conn.cursor()
     
     try:
+        # Crea la query per creare una nuova tabella
         query = f"""
-        CREATE TABLE [{customer_name}] (
-            ID AUTOINCREMENT PRIMARY KEY,
-            [DATA] DATE,
-            [NUMERO FATTURA] TEXT(50),
-            [DARE] CURRENCY,
-            [AVERE] CURRENCY,
-            [TOTALE] CURRENCY,
-            [NOTE] TEXT(255)
+        CREATE TABLE {customer_name} (
+            ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            DATA DATE,
+            NUMERO_FATTURA TEXT,
+            DARE REAL,
+            AVERE REAL,
+            TOTALE REAL,
+            NOTE TEXT
         )
         """
         cursor.execute(query)
         conn.commit()
-        conn.close()
         QMessageBox.information(None, "Successo", f"Tabella per {customer_name} creata con successo.")
-    except Exception as e:
-        print(str(e))
-        # QMessageBox.critical(None, "Errore", f"Impossibile creare la tabella per {customer_name}: {str(e)}")
+    except sqlite3.Error as e:
+        print(f"Errore durante la creazione della tabella: {e}")
+        QMessageBox.critical(None, "Errore", f"Impossibile creare la tabella per {customer_name}: {str(e)}")
+    finally:
+        conn.close()
 
 class LoginWindow(QWidget):
     def __init__(self):
@@ -248,31 +267,28 @@ class CustomerPage(QWidget):
         header_view = self.table.horizontalHeader()
         header_view.setStyleSheet("font-weight: bold;")
 
-        # Allarga colonne
+        # Allarga colonne e estende l'ultima sezione
         self.table.setColumnWidth(1, 120)
         self.table.setColumnWidth(2, 140)
         self.table.setColumnWidth(3, 90)
         self.table.setColumnWidth(4, 90)
         self.table.setColumnWidth(5, 90)
-
-        # Estende l'ultima sezione per riempire la larghezza della tabella
         header_view.setStretchLastSection(True)
 
-        # Imposta la politica del menu contestuale
+        # Imposta la politica del menu contestuale e delegate
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_context_menu)
-
-        # Applicazione del delegate alla colonna della data
         self.date_delegate = DateDelegate(self.table)
         self.table.setItemDelegateForColumn(1, self.date_delegate)
-
+        
         layout.addWidget(self.table)
 
         # Riga dei totali
         total_layout = QHBoxLayout()
 
-        self.total_label = QLabel("TOTALE")
-        self.total_label.setFont(header_font)
+        # Etichetta per il nome del cliente
+        self.customer_name_label = QLabel("")
+        self.customer_name_label.setFont(header_font)
 
         # Layout per DARE
         dare_layout = QHBoxLayout()
@@ -299,7 +315,7 @@ class CustomerPage(QWidget):
         totale_layout.addStretch()
 
         # Aggiungi i layout alla riga totale principale
-        total_layout.addWidget(self.total_label)
+        total_layout.addWidget(self.customer_name_label)
         total_layout.addStretch()
         total_layout.addLayout(dare_layout)
         total_layout.addLayout(avere_layout)
@@ -331,17 +347,35 @@ class CustomerPage(QWidget):
         self.avere_validator = QDoubleValidator(0.0, 1e6, 2)
 
     def apply_theme(self):
-        # Applica il tema scuro alla tabella
+        # Applica il tema e stili alla tabella
         table_style = """
+            QTableWidget {
+                background-color: #f9f9f9;  /* Sfondo chiaro della tabella */
+                color: #000000;              /* Colore del testo */
+                border: 1px solid #d0d0d0;  /* Bordo della tabella */
+            }
+            QHeaderView::section {
+                background-color: #e0e0e0;  /* Sfondo intestazioni chiaro */
+                color: #000000;             /* Colore testo intestazioni */
+                border: 1px solid #b0b0b0;  /* Bordo intestazioni chiaro */
+                padding: 5px;               /* Padding intestazioni */
+            }
             QTableWidget::item:selected {
-                background-color: #d0d0d0; 
-                color : #000000;
+                background-color: #d0d0d0;  /* Sfondo delle celle selezionate */
+                color: #000000;             /* Colore testo delle celle selezionate */
+            }
+            QTableWidget::item:hover {
+                background-color: #f0f0f0;  /* Sfondo delle celle al passaggio del mouse */
+            }
+            QTableWidget QTableCornerButton::section {
+                background-color: #e0e0e0;  /* Sfondo angolo in alto a sinistra */
             }
         """
         self.table.setStyleSheet(table_style)
 
     def load_data(self, customer_name):
         self.customer_name = customer_name
+        self.customer_name_label.setText(customer_name)  # Imposta il nome del cliente
         data = load_customer_data(customer_name)
         if data is not None:
             # Converti e ordina i dati in base alla colonna della data (assumendo che la data sia nella colonna 1)
@@ -377,18 +411,27 @@ class CustomerPage(QWidget):
         customer_name = self.customer_name
         row_count = self.table.rowCount()
         data = []
-        
+
         for row in range(row_count):
             row_data = []
             for col in range(7):
                 item = self.table.item(row, col)
                 row_data.append(item.text() if item else "")
             data.append(row_data)
-        
+        # print(f"IDs to delete: {self.deleted_row_ids}")
         save_customer_data(customer_name, data, self.deleted_row_ids)
-        
         # Pulisci la lista degli ID eliminati
         self.deleted_row_ids.clear()
+
+    def delete_row(self):
+        current_row = self.table.currentRow()
+        if current_row >= 0:
+            item_id = self.table.item(current_row, 0)
+            if item_id and item_id.text():  # Controlla se l'elemento ID esiste e ha testo
+                # print(f"Deleting row with ID: {item_id.text()}")
+                self.deleted_row_ids.add(item_id.text())  # Aggiungi l'ID alla lista
+            self.table.removeRow(current_row)
+            self.calculate_totals()
 
     def on_item_changed(self, item):
         if item.column() in [3, 4]:  # Colonne Dare e Avere
@@ -466,15 +509,6 @@ class CustomerPage(QWidget):
         current_row = self.table.currentRow()
         self.table.insertRow(current_row + 1)
         self.set_current_row(current_row + 1)
-
-    def delete_row(self):
-        current_row = self.table.currentRow()
-        if current_row >= 0:
-            item_id = self.table.item(current_row, 0)
-            if item_id:
-                self.deleted_row_ids.add(item_id.text())  # Aggiungi questa riga
-            self.table.removeRow(current_row)
-            self.calculate_totals()
 
     def set_current_row(self, row):
         self.table.setCurrentCell(row, 0)
@@ -575,6 +609,8 @@ class HomePage(QWidget):
                 self.parent().setCurrentIndex(2)
             else:
                 QMessageBox.warning(self, "Attenzione", f"Il nome del cliente '{customer_name}' esiste già. Scegli un altro nome.")
+        else:
+            QMessageBox.warning(self, "Attenzione", "Inserisci il nome del cliente da creare.")
 
 class DateDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
@@ -824,8 +860,8 @@ class SettingsPage(QWidget):
             QMessageBox.warning(self, "Attenzione", "File di configurazione non trovato.")
 
     def browse_file(self):
-        """ Permette all'utente di selezionare un nuovo file Access """
-        file_dialog = QFileDialog(self, "Seleziona File Access", "", "Access Database (*.accdb)")
+        """ Permette all'utente di selezionare un file SQLite """
+        file_dialog = QFileDialog(self, "Seleziona File SQLite", "", "SQLite Database (*.sqlite)")
         if file_dialog.exec():
             selected_file = file_dialog.selectedFiles()[0]
             self.path_input.setText(selected_file)

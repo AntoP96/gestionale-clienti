@@ -1,13 +1,13 @@
 # Customer Management System
 
-**Customer Management System** is a client management application developed in Python using PyQt5 and pyodbc. The application allows you to manage client data through a graphical user interface and a Microsoft Access database.
+**Customer Management System** is a client management application developed in Python using PyQt5 and sqlite3. The application allows you to manage client data through a graphical user interface and a sqlite database.
 
 ## Requirements
 
 - Python 3.x
 - PyQt6
 - pyodbc
-- Microsoft Access Driver (*.mdb, *.accdb)
+- sqlite3
 
 ## Installation
 
@@ -29,14 +29,14 @@
     pip install -r requirements.txt
     ```
 
-    Make sure you have the Microsoft Access Driver installed on your system.
+    Make sure you have the sqlite3 installed on your system.
 
 4. **Configure the `config.txt` file**:
 
-    Edit the `config.txt` file to specify the path to your Access database. Example content:
+    Edit the `config.txt` file to specify the path to your sqlite database. Example content:
 
     ```
-    C:\path\to\your\database.accdb
+    C:\path\to\your\database.sqlite
     ```
 
 ## Usage
@@ -60,15 +60,15 @@
     If you want to create a standalone executable, you can use PyInstaller:
 
     ```bash
-    python -m PyInstaller --name "Customer Management System" --onefile gestioneClienti.py
+    python -m PyInstaller --name "Gestione Clienti" --onefile gestioneClienti.py
     ```
 
-    Modify the `.spec` file to include external files if necessary, then run (as shown in the `Customer Management System.spec.example` file).
+    Modify the `.spec` file to include external files if necessary, then run (as shown in the `gestioneClienti.spec` file).
 
     Build the complete application:
 
     ```bash
-    python -m PyInstaller "Customer Management System.spec"
+    python -m PyInstaller "gestioneClienti.spec"
     ```
 
 ## Contributions
