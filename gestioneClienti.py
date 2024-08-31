@@ -44,17 +44,17 @@ def load_customer_data(customer_name):
             if date_value is not None:
                 # Convert the date to d-m-y format if it's in y-m-d
                 if isinstance(date_value, datetime):
-                    formatted_row[1] = date_value.strftime("%d-%m-%y")
+                    formatted_row[1] = date_value.strftime("%d-%m-%Y")
                 else:
                     # Try to convert the date if it's in string format
                     try:
                         date_obj = datetime.strptime(date_value, "%Y-%m-%d")
-                        formatted_row[1] = date_obj.strftime("%d-%m-%y")
+                        formatted_row[1] = date_obj.strftime("%d-%m-%Y")
                     except ValueError:
                         # If the date is in d-m-y
                         try:
-                            date_obj = datetime.strptime(date_value, "%d-%m-%y")
-                            formatted_row[1] = date_obj.strftime("%d-%m-%y")
+                            date_obj = datetime.strptime(date_value, "%d-%m-%Y")
+                            formatted_row[1] = date_obj.strftime("%d-%m-%Y")
                         except ValueError:
                             formatted_row[1] = None  # Handle invalid date formats
             else:
@@ -219,6 +219,8 @@ class LoginWindow(QWidget):
             self.username_input.clear()
             self.password_input.clear()
         else:
+            self.parent().setCurrentIndex(1)  # Vai alla home page
+            self.parent().parent().enable_menu_actions()
             self.username_input.clear()
             self.password_input.clear()
             QMessageBox.critical(self, "Errore di accesso", "Nome utente o password errati.")
@@ -246,9 +248,12 @@ class CustomerPage(QWidget):
         header_view = self.table.horizontalHeader()
         header_view.setStyleSheet("font-weight: bold;")
 
-        # Allarga la colonna "NUMERO FATTURA"
-        self.table.setColumnWidth(1, 150)
-        self.table.setColumnWidth(2, 150)
+        # Allarga colonne
+        self.table.setColumnWidth(1, 120)
+        self.table.setColumnWidth(2, 140)
+        self.table.setColumnWidth(3, 90)
+        self.table.setColumnWidth(4, 90)
+        self.table.setColumnWidth(5, 90)
 
         # Estende l'ultima sezione per riempire la larghezza della tabella
         header_view.setStretchLastSection(True)
@@ -339,11 +344,19 @@ class CustomerPage(QWidget):
         self.customer_name = customer_name
         data = load_customer_data(customer_name)
         if data is not None:
+            # Converti e ordina i dati in base alla colonna della data (assumendo che la data sia nella colonna 1)
+            try:
+                # Converti le date in QDate e ordina i dati
+                data.sort(key=lambda x: QDate.fromString(x[1], "dd-MM-yyyy"))
+            except Exception as e:
+                QMessageBox.warning(self, "Errore", f"Errore nell'ordinamento delle date: {e}")
+                data.sort(key=lambda x: x[1])  # Ordina per data come stringa se l'ordinamento per QDate fallisce
+
             self.table.setRowCount(0)  # Pulisce la tabella
             for row_data in data:
                 row_position = self.table.rowCount()
                 self.table.insertRow(row_position)
-                for col_index, cell_data in enumerate(row_data):  # Include ID here
+                for col_index, cell_data in enumerate(row_data):
                     item_text = str(cell_data) if cell_data is not None else ""
                     item = QTableWidgetItem(item_text)
                     
@@ -355,6 +368,7 @@ class CustomerPage(QWidget):
                         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                     
                     self.table.setItem(row_position, col_index, item)
+            
             self.calculate_totals()
         else:
             QMessageBox.warning(self, "Errore", f"Impossibile caricare i dati per il cliente '{customer_name}'.")
@@ -473,16 +487,19 @@ class CustomerPage(QWidget):
 
     def update_row_background_color(self, row):
         totale_item = self.table.item(row, 5)
-        totale_value = float(totale_item.text()) if totale_item and totale_item.text() else 0
         
-        # Applica il colore solo alla cella "Totale"
-        if totale_item:  # Verifica se l'item della colonna "Totale" esiste
+        if totale_item:
+            totale_value = float(totale_item.text()) if totale_item.text() else 0
+            
+            # Applica il colore solo alla cella "Totale"
             row_color = QColor(255, 0, 0) if totale_value < 0 else QColor(255, 255, 255)
             totale_item.setBackground(row_color)  # Imposta il colore solo per la cella "Totale"
         else:
-            # Se non esiste, puoi impostare un colore di default (opzionale)
+            # Se l'item non esiste, puoi creare un nuovo QTableWidgetItem con il colore di default
+            totale_item = QTableWidgetItem()
             totale_item.setBackground(QColor(255, 255, 255))
-
+            self.table.setItem(row, 5, totale_item)
+        
         self.table.viewport().update()
         self.table.update()
         self.repaint()
@@ -639,46 +656,46 @@ class MainWindow(QMainWindow):
         # Mostra la pagina di login all'avvio
         self.central_widget.setCurrentIndex(0)
 
-        # Menu principale
-        self.create_menu()
+        # Creazione della barra degli strumenti
+        self.create_toolbar()
 
         # Applica il tema
         self.apply_theme()
 
-    def create_menu(self):
-        """ Crea la barra di menu principale """
-        menu_bar = self.menuBar()
-
-        # Menu principale
-        self.home_action = QAction("Home", self)
-        self.home_action.triggered.connect(self.go_to_home)
-        menu_bar.addAction(self.home_action)
+    def create_toolbar(self):
+        """ Crea la barra degli strumenti principale """
+        toolbar = QWidget()
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.settings_action = QAction("Settings", self)
-        self.settings_action.triggered.connect(self.go_to_settings)
-        menu_bar.addAction(self.settings_action)
+        # Crea i bottoni per la toolbar
+        self.home_button = QPushButton("Home")
+        self.settings_button = QPushButton("Settings")
+        self.info_button = QPushButton("Info")
+        self.logout_button = QPushButton("Logout")
         
-        self.info_action = QAction("Info", self)
-        self.info_action.triggered.connect(self.show_info)
-        menu_bar.addAction(self.info_action)
+        # Collega i bottoni alle azioni
+        self.home_button.clicked.connect(self.go_to_home)
+        self.settings_button.clicked.connect(self.go_to_settings)
+        self.info_button.clicked.connect(self.show_info)
+        self.logout_button.clicked.connect(self.logout)
         
-        self.logout_action = QAction("Logout", self)
-        self.logout_action.triggered.connect(self.logout)
-        menu_bar.addAction(self.logout_action)
+        # Aggiungi i bottoni alla barra degli strumenti
+        toolbar_layout.addWidget(self.home_button)
+        toolbar_layout.addWidget(self.settings_button)
+        toolbar_layout.addWidget(self.info_button)
+        toolbar_layout.addWidget(self.logout_button)
+        
+        toolbar.setLayout(toolbar_layout)
+        self.setMenuWidget(toolbar)
 
-        # Imposta i ruoli dei menu per macOS
-        self.home_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
-        self.settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
-        self.info_action.setMenuRole(QAction.MenuRole.TextHeuristicRole)
-        self.logout_action.setMenuRole(QAction.MenuRole.QuitRole)
-
-        # Disabilita inizialmente le azioni che devono essere visibili solo dopo il login
-        self.logout_action.setVisible(False)
-        self.home_action.setEnabled(False)
-        self.settings_action.setVisible(True)
+        # Disabilita inizialmente i bottoni che devono essere visibili solo dopo il login
+        self.logout_button.setVisible(False)
+        self.home_button.setEnabled(False)
+        self.settings_button.setVisible(True)
 
     def apply_theme(self):
-        """Apply a light theme with vibrant colors"""
+        """Applica un tema chiaro con colori vivaci"""
         style_sheet = """
             QWidget {
                 background-color: #F5F5F5;
@@ -704,22 +721,16 @@ class MainWindow(QMainWindow):
             QLabel {
                 color: #333333;
             }
-            QMenuBar {
+            QWidget#toolbar {
                 background-color: #E0E0E0;
                 color: #333333;
             }
-            QMenuBar::item {
+            QPushButton#toolbarButton {
                 background-color: #E0E0E0;
                 color: #333333;
             }
-            QMenuBar::item:selected {
+            QPushButton#toolbarButton:hover {
                 background-color: #D0D0D0;
-            }
-            QHeaderView::section {
-                background-color: #E0E0E0;
-                color: #333333;
-                padding: 4px;
-                border: 1px solid #CCCCCC;
             }
         """
         self.setStyleSheet(style_sheet)
@@ -742,16 +753,16 @@ class MainWindow(QMainWindow):
     def logout(self):
         """ Logout e torna alla pagina di login """
         self.central_widget.setCurrentIndex(0)
-        # Disabilita le azioni del menu
-        self.home_action.setEnabled(False)
-        self.logout_action.setVisible(False)
-        self.settings_action.setVisible(True)
+        # Disabilita i bottoni
+        self.home_button.setEnabled(False)
+        self.logout_button.setVisible(False)
+        self.settings_button.setVisible(True)
 
     def enable_menu_actions(self):
-        """ Abilita le azioni del menu dopo il login """
-        self.home_action.setEnabled(True)
-        self.logout_action.setVisible(True)
-        self.settings_action.setVisible(False)
+        """ Abilita i bottoni dopo il login """
+        self.home_button.setEnabled(True)
+        self.logout_button.setVisible(True)
+        self.settings_button.setVisible(False)
 
 class SettingsPage(QWidget):
     def __init__(self):
