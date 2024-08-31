@@ -176,7 +176,7 @@ def create_new_customer(customer_name):
         CREATE TABLE {customer_name} (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
             DATA DATE,
-            NUMERO FATTURA TEXT,
+            [NUMERO FATTURA] TEXT,
             DARE REAL,
             AVERE REAL,
             TOTALE REAL,
