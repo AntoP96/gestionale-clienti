@@ -324,20 +324,6 @@ class CustomerPage(QWidget):
         # Imposta i validatori per le colonne Dare e Avere
         self.dare_validator = QDoubleValidator(0.0, 1e6, 2)
         self.avere_validator = QDoubleValidator(0.0, 1e6, 2)
-        
-        # Impostazioni specifiche per macOS per garantire la visibilità del menu
-        self.ensure_menu_visibility_mac()
-
-    def ensure_menu_visibility_mac(self):
-        if sys.platform == 'darwin':  # Verifica se la piattaforma è macOS
-            print("Applying macOS-specific menu visibility settings...")
-            # Imposta le flag di finestra per garantire la visibilità della barra degli strumenti
-            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.WindowSystemMenuHint)
-            
-            # Forza il ridisegno della finestra per applicare le modifiche
-            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
-            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
-            self.show()
 
     def apply_theme(self):
         # Applica il tema scuro alla tabella
@@ -658,6 +644,19 @@ class MainWindow(QMainWindow):
 
         # Apply the theme
         self.apply_theme()
+        # Impostazioni specifiche per macOS per garantire la visibilità del menu
+        self.ensure_menu_visibility_mac()
+
+    def ensure_menu_visibility_mac(self):
+        if sys.platform == 'darwin':  # Verifica se la piattaforma è macOS
+            print("Applying macOS-specific menu visibility settings...")
+            # Imposta le flag di finestra per garantire la visibilità della barra degli strumenti
+            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.WindowSystemMenuHint)
+            
+            # Forza il ridisegno della finestra per applicare le modifiche
+            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+            self.show()
 
     def create_menu(self):
         """ Crea la barra di menu principale """
