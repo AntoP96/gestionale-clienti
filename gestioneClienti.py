@@ -642,21 +642,8 @@ class MainWindow(QMainWindow):
         # Menu principale
         self.create_menu()
 
-        # Apply the theme
+        # Applica il tema
         self.apply_theme()
-        # Impostazioni specifiche per macOS per garantire la visibilità del menu
-        self.ensure_menu_visibility_mac()
-
-    def ensure_menu_visibility_mac(self):
-        if sys.platform == 'darwin':  # Verifica se la piattaforma è macOS
-            print("Applying macOS-specific menu visibility settings...")
-            # Imposta le flag di finestra per garantire la visibilità della barra degli strumenti
-            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.WindowSystemMenuHint)
-            
-            # Forza il ridisegno della finestra per applicare le modifiche
-            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
-            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
-            self.show()
 
     def create_menu(self):
         """ Crea la barra di menu principale """
@@ -678,6 +665,12 @@ class MainWindow(QMainWindow):
         self.logout_action = QAction("Logout", self)
         self.logout_action.triggered.connect(self.logout)
         menu_bar.addAction(self.logout_action)
+
+        # Imposta i ruoli dei menu per macOS
+        self.home_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
+        self.settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
+        self.info_action.setMenuRole(QAction.MenuRole.HelpRole)
+        self.logout_action.setMenuRole(QAction.MenuRole.QuitRole)
 
         # Disabilita inizialmente le azioni che devono essere visibili solo dopo il login
         self.logout_action.setVisible(False)
