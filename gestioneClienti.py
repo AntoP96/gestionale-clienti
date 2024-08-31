@@ -669,7 +669,7 @@ class MainWindow(QMainWindow):
         # Imposta i ruoli dei menu per macOS
         self.home_action.setMenuRole(QAction.MenuRole.ApplicationSpecificRole)
         self.settings_action.setMenuRole(QAction.MenuRole.PreferencesRole)
-        self.info_action.setMenuRole(QAction.MenuRole.HelpRole)
+        self.info_action.setMenuRole(QAction.MenuRole.TextHeuristicRole)
         self.logout_action.setMenuRole(QAction.MenuRole.QuitRole)
 
         # Disabilita inizialmente le azioni che devono essere visibili solo dopo il login
