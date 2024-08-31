@@ -20,16 +20,17 @@ CONFIG_FILE = resource_path("config.txt")
 # Connessione al database Access
 def connect_db():
     try:
-        # Connessione al database SQLite
+        print(f"Attempting to connect to database at: {db_path}")
         conn = sqlite3.connect(db_path)
         return conn
     except sqlite3.Error as e:
         QMessageBox.critical(None, "Errore di Connessione", f"Errore durante la connessione al database: {str(e)}")
+        print(f"Connection error: {e}")
         return None
 
 # Funzione per caricare i dati di un cliente
 def load_customer_data(customer_name):
-    conn = connect_db()  # Ensure you have a valid connection function
+    conn = connect_db()
     cursor = conn.cursor()
 
     try:
