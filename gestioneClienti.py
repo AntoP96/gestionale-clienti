@@ -22,7 +22,6 @@ CONFIG_FILE = resource_path("config.txt")
 # Connessione al database Access
 def connect_db():
     try:
-        print(f"Attempting to connect to database at: {db_path}")
         conn = sqlite3.connect(db_path)
         return conn
     except sqlite3.Error as e:
@@ -177,7 +176,7 @@ def create_new_customer(customer_name):
         CREATE TABLE {customer_name} (
             ID INTEGER PRIMARY KEY AUTOINCREMENT,
             DATA DATE,
-            NUMERO_FATTURA TEXT,
+            NUMERO FATTURA TEXT,
             DARE REAL,
             AVERE REAL,
             TOTALE REAL,
