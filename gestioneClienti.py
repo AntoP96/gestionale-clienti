@@ -6,6 +6,8 @@ import sqlite3
 from datetime import datetime
 import os
 
+global db_path
+
 def resource_path(relative_path):
     """ Get the absolute path to a resource, works for dev and for PyInstaller """
     if getattr(sys, 'frozen', False):
@@ -835,7 +837,6 @@ class SettingsPage(QWidget):
         self.setLayout(layout)
         
     def save_db_path(self):
-        global db_path
         new_path = self.path_input.text()
         try:
             with open(CONFIG_FILE, 'w') as file:
