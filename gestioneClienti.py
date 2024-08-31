@@ -329,8 +329,14 @@ class CustomerPage(QWidget):
         self.ensure_menu_visibility_mac()
 
     def ensure_menu_visibility_mac(self):
-        if sys.platform == 'darwin':  # Check if the platform is macOS
-            self.setWindowFlags(Qt.WindowType.MacWindowToolBarButtonHint | Qt.WindowType.Window)
+        if sys.platform == 'darwin':  # Verifica se la piattaforma è macOS
+            # Imposta le flag di finestra per garantire la visibilità della barra degli strumenti
+            self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.WindowTitleHint | Qt.WindowType.WindowSystemMenuHint)
+            
+            # Forza il ridisegno della finestra per applicare le modifiche
+            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+            self.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+            self.show()
 
     def apply_theme(self):
         # Applica il tema scuro alla tabella
