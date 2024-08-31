@@ -240,8 +240,6 @@ class LoginWindow(QWidget):
             self.username_input.clear()
             self.password_input.clear()
         else:
-            self.parent().setCurrentIndex(1)  # Vai alla home page
-            self.parent().parent().enable_menu_actions()
             self.username_input.clear()
             self.password_input.clear()
             QMessageBox.critical(self, "Errore di accesso", "Nome utente o password errati.")
