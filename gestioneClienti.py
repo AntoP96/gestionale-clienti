@@ -6,8 +6,6 @@ import sqlite3
 from datetime import datetime
 import os
 
-global db_path
-
 def resource_path(relative_path):
     """ Get the absolute path to a resource, works for dev and for PyInstaller """
     if getattr(sys, 'frozen', False):
@@ -19,6 +17,16 @@ def resource_path(relative_path):
 # File di configurazione dove salvare il percorso del database Access
 CONFIG_FILE = resource_path("config.txt")
 
+def load_config():
+    global db_path
+    try:
+        with open(CONFIG_FILE, 'r') as file:
+            db_path = file.readline().strip()
+    except Exception as e:
+        QMessageBox.critical(None, "Errore di Configurazione", f"Errore durante la lettura del file di configurazione: {str(e)}")
+        print(f"Config error: {e}")
+load_config()
+
 # Connessione al database Access
 def connect_db():
     try:
@@ -28,6 +36,30 @@ def connect_db():
         QMessageBox.critical(None, "Errore di Connessione", f"Errore durante la connessione al database: {str(e)}")
         print(f"Connection error: {e}")
         return None
+
+def load_customers(customer_table):
+    conn = connect_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    tables = cursor.fetchall()
+    customer_table.setRowCount(len(tables))
+    for row_idx, table in enumerate(tables):
+        customer_name = table[0]
+        cursor.execute(f"""
+            SELECT SUM(TOTALE) 
+            FROM [{customer_name}]
+        """)
+        total = cursor.fetchone()[0]
+        total = total if total is not None else 0
+        name_item = QTableWidgetItem(customer_name)
+        name_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        customer_table.setItem(row_idx, 0, name_item)
+
+        total_item = QTableWidgetItem(str(total))
+        total_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        customer_table.setItem(row_idx, 1, total_item)
+    customer_table.resizeColumnsToContents()
+    conn.close()
 
 # Funzione per caricare i dati di un cliente
 def load_customer_data(customer_name):
@@ -558,7 +590,22 @@ class HomePage(QWidget):
         self.image_label.setGeometry(0, 0, self.width(), self.height())
         layout.addWidget(self.image_label)
 
-        # Elementi dell'interfaccia utente
+        # Layout orizzontale per separare la tabella dei clienti e i campi di input
+        main_layout = QHBoxLayout()
+
+        # Crea la tabella per visualizzare i clienti
+        self.customer_table = QTableWidget()
+        self.customer_table.setColumnCount(2)
+        self.customer_table.setHorizontalHeaderLabels(["Nome Cliente", "Totale"])
+        self.customer_table.cellClicked.connect(self.on_customer_click)
+
+        # Carica i dati dei clienti
+        load_customers(self.customer_table)
+
+        # Layout della tabella
+        main_layout.addWidget(self.customer_table)
+
+        # Layout verticale per gli input
         input_layout = QVBoxLayout()
         self.customer_name_input = QLineEdit()
         self.customer_name_input.setPlaceholderText("Nome Cliente")
@@ -569,13 +616,18 @@ class HomePage(QWidget):
         self.new_button.clicked.connect(self.new_customer)
         input_layout.addWidget(self.search_button)
         input_layout.addWidget(self.new_button)
-        input_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centra gli elementi
+        input_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        container_widget = QWidget(self)
-        container_widget.setLayout(input_layout)
-        container_widget.setGeometry(10, self.height() - 150, self.width() - 20, 140)  # Posiziona il layout in basso
-        layout.addWidget(container_widget)
+        # Aggiungi layout principale
+        main_layout.addLayout(input_layout)
+
+        # Aggiungi il layout finale alla finestra
+        layout.addLayout(main_layout)
         self.setLayout(layout)
+
+    def on_customer_click(self, row, column):
+        customer_name = self.customer_table.item(row, column).text()
+        self.customer_name_input.setText(customer_name)
 
     def resizeEvent(self, event):
         self.image_label.setGeometry(0, 0, self.width(), self.height())
@@ -605,6 +657,7 @@ class HomePage(QWidget):
         if customer_name:
             if is_customer_name_unique(customer_name): 
                 create_new_customer(customer_name)
+                load_customers(self.customer_table)
                 self.parent().widget(2).load_data(customer_name)
                 self.parent().setCurrentIndex(2)
             else:
