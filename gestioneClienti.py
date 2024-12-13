@@ -6,6 +6,10 @@ import sqlite3
 from datetime import datetime
 import os
 
+# Eliminare colonna totale
+# Ingrandire e colorare rosso/verde il totale in fondo
+# Lista clienti in ordine alfabetico o ultima modifica
+
 def resource_path(relative_path):
     """ Get the absolute path to a resource, works for dev and for PyInstaller """
     if getattr(sys, 'frozen', False):
