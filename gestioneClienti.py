@@ -6,9 +6,8 @@ import sqlite3
 from datetime import datetime
 import os
 
-# Eliminare colonna totale
-# Ingrandire e colorare rosso/verde il totale in fondo
 # Lista clienti in ordine alfabetico o ultima modifica
+# accessi per 3 utenti che hanno 3 database diversi e modifica logo per ogni utente
 
 def resource_path(relative_path):
     """ Get the absolute path to a resource, works for dev and for PyInstaller """
@@ -62,7 +61,6 @@ def load_customers(customer_table):
         total_item = QTableWidgetItem(str(total))
         total_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         customer_table.setItem(row_idx, 1, total_item)
-    customer_table.resizeColumnsToContents()
     conn.close()
 
 # Funzione per caricare i dati di un cliente
@@ -294,21 +292,19 @@ class CustomerPage(QWidget):
         headers = ["ID", "DATA", "NUMERO FATTURA", "DARE", "AVERE", "TOTALE", "NOTE"]
         self.table.setHorizontalHeaderLabels(headers)
 
-        # Nascondi la colonna ID (colonna 0)
+        # Nascondi la colonna ID e TOTALE (colonna 0 e 5)
         self.table.setColumnHidden(0, True)
+        self.table.setColumnHidden(5, True)
 
-        # Imposta il font in grassetto per le intestazioni
-        header_font = QFont()
-        header_font.setBold(True)
+        # Imposta il font in grassetto per le intestazioni e aumenta la dimensione
         header_view = self.table.horizontalHeader()
-        header_view.setStyleSheet("font-weight: bold;")
 
         # Allarga colonne e estende l'ultima sezione
-        self.table.setColumnWidth(1, 120)
-        self.table.setColumnWidth(2, 140)
-        self.table.setColumnWidth(3, 90)
-        self.table.setColumnWidth(4, 90)
-        self.table.setColumnWidth(5, 90)
+        self.table.setColumnWidth(1, 180)
+        self.table.setColumnWidth(2, 220)
+        self.table.setColumnWidth(3, 120)
+        self.table.setColumnWidth(4, 120)
+        self.table.setColumnWidth(5, 120)
         header_view.setStretchLastSection(True)
 
         # Imposta la politica del menu contestuale e delegate
@@ -324,7 +320,6 @@ class CustomerPage(QWidget):
 
         # Etichetta per il nome del cliente
         self.customer_name_label = QLabel("")
-        self.customer_name_label.setFont(header_font)
 
         # Layout per DARE
         dare_layout = QHBoxLayout()
@@ -383,18 +378,21 @@ class CustomerPage(QWidget):
         self.avere_validator = QDoubleValidator(0.0, 1e6, 2)
 
     def apply_theme(self):
-        # Applica il tema e stili alla tabella
+        # Applica il tema e stili alla tabella con testo ingrandito
         table_style = """
             QTableWidget {
                 background-color: #f9f9f9;  /* Sfondo chiaro della tabella */
                 color: #000000;              /* Colore del testo */
                 border: 1px solid #d0d0d0;  /* Bordo della tabella */
+                font-size: 14px;             /* Dimensione testo celle */
             }
             QHeaderView::section {
                 background-color: #e0e0e0;  /* Sfondo intestazioni chiaro */
                 color: #000000;             /* Colore testo intestazioni */
                 border: 1px solid #b0b0b0;  /* Bordo intestazioni chiaro */
-                padding: 5px;               /* Padding intestazioni */
+                padding: 8px;               /* Maggiore padding intestazioni */
+                font-weight: bold;          /* Intestazioni in grassetto */
+                font-size: 16px;            /* Dimensione testo intestazioni */
             }
             QTableWidget::item:selected {
                 background-color: #d0d0d0;  /* Sfondo delle celle selezionate */
@@ -405,9 +403,47 @@ class CustomerPage(QWidget):
             }
             QTableWidget QTableCornerButton::section {
                 background-color: #e0e0e0;  /* Sfondo angolo in alto a sinistra */
+                border: 1px solid #b0b0b0;  /* Bordo angolo */
             }
         """
         self.table.setStyleSheet(table_style)
+
+        # Aumenta la dimensione del testo del nome del cliente
+        customer_name_style = """
+            QLabel {
+                font-size: 24px;          /* Dimensione del testo per il nome cliente */
+                font-weight: bold;        /* Testo in grassetto */
+                color: #333333;           /* Colore del testo */
+                padding: 10px;            /* Spaziatura interna */
+            }
+        """
+        self.customer_name_label.setStyleSheet(customer_name_style)
+
+        totals_label_style = """
+            QLabel {
+                font-size: 14px;          /* Dimensione del testo per i label */
+                font-weight: normal;      /* Testo normale */
+                color: #333333;           /* Colore del testo */
+            }
+        """
+        # Stile per i numeri dei totali (di base)
+        totals_number_style = """
+            QLabel {
+                font-size: 16px;          /* Dimensione del testo per i numeri */
+                font-weight: bold;        /* Testo in grassetto */
+                color: #333333;           /* Colore del testo */
+            }
+        """
+
+        # Applica lo stile base ai label
+        self.total_dare_label.setStyleSheet(totals_label_style)
+        self.total_avere_label.setStyleSheet(totals_label_style)
+        self.total_totale_label.setStyleSheet(totals_label_style)
+
+        # Applica lo stile base ai numeri
+        self.total_dare.setStyleSheet(totals_number_style)
+        self.total_avere.setStyleSheet(totals_number_style)
+        self.total_totale.setStyleSheet(totals_number_style)
 
     def load_data(self, customer_name):
         self.customer_name = customer_name
@@ -484,7 +520,7 @@ class CustomerPage(QWidget):
         
         dare_value = float(dare_item.text()) if dare_item and dare_item.text() else 0
         avere_value = float(avere_item.text()) if avere_item and avere_item.text() else 0
-        totale_value = round(dare_value - avere_value, 2)
+        totale_value = round(avere_value - dare_value, 2)
 
         totale_item = QTableWidgetItem(self.format_number(totale_value))
         totale_item.setFlags(totale_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
@@ -507,9 +543,15 @@ class CustomerPage(QWidget):
             self.total_avere_value += float(avere_item.text()) if avere_item and avere_item.text() else 0
             self.total_totale_value += float(totale_item.text()) if totale_item and totale_item.text() else 0
 
+        # Aggiorna i testi delle etichette con i valori calcolati
         self.total_dare.setText(f"{self.format_number(self.total_dare_value)} €")
         self.total_avere.setText(f"{self.format_number(self.total_avere_value)} €")
         self.total_totale.setText(f"{self.format_number(self.total_totale_value)} €")
+
+        if self.total_totale_value < 0:
+            self.total_totale.setStyleSheet("color: red; font-size: 20px; font-weight: bold;")
+        else:
+            self.total_totale.setStyleSheet("color: black; font-size: 20px; font-weight: bold;")
 
         # Aggiorna il colore di sfondo di tutte le righe
         self.update_all_rows_background_color()
@@ -586,13 +628,14 @@ class HomePage(QWidget):
     def setup_ui(self):
         layout = QVBoxLayout()
 
-        # Aggiungi un'immagine di sfondo
+        # Aggiungi un'immagine di sfondo che occupa solo la parte superiore
         self.image_label = QLabel(self)
         pixmap = QPixmap(resource_path("bg.png"))
         self.image_label.setPixmap(pixmap)
-        self.image_label.setScaledContents(True)
-        self.image_label.setGeometry(0, 0, self.width(), self.height())
-        layout.addWidget(self.image_label)
+        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centra l'immagine
+        self.image_label.setFixedHeight(pixmap.height())  # Fissa l'altezza dell'immagine
+
+        layout.addWidget(self.image_label)  # Aggiungi l'immagine al layout
 
         # Layout orizzontale per separare la tabella dei clienti e i campi di input
         main_layout = QHBoxLayout()
@@ -601,18 +644,31 @@ class HomePage(QWidget):
         self.customer_table = QTableWidget()
         self.customer_table.setColumnCount(2)
         self.customer_table.setHorizontalHeaderLabels(["Nome Cliente", "Totale"])
+        
+        # Imposta la larghezza della prima colonna
+        self.customer_table.setColumnWidth(0, 200)
+        
+        # Impostare le intestazioni in grassetto
+        header = self.customer_table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        
+        # Imposta il font in grassetto per le intestazioni
+        font = QFont()
+        font.setBold(True)
+        self.customer_table.horizontalHeaderItem(0).setFont(font)
+        self.customer_table.horizontalHeaderItem(1).setFont(font)
+
         self.customer_table.cellClicked.connect(self.on_customer_click)
 
-        # Carica i dati dei clienti
-        load_customers(self.customer_table)
-
-        # Layout della tabella
+        # Aggiungere la tabella al layout orizzontale
         main_layout.addWidget(self.customer_table)
 
         # Layout verticale per gli input
         input_layout = QVBoxLayout()
         self.customer_name_input = QLineEdit()
         self.customer_name_input.setPlaceholderText("Nome Cliente")
+        self.customer_name_input.textChanged.connect(self.filter_customers)
         input_layout.addWidget(self.customer_name_input)
         self.search_button = QPushButton("Cerca Cliente")
         self.new_button = QPushButton("Nuovo Cliente")
@@ -629,12 +685,53 @@ class HomePage(QWidget):
         layout.addLayout(main_layout)
         self.setLayout(layout)
 
+        # Carica i dati dei clienti
+        self.load_customer_data_home()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self.load_customer_data_home()
+        self.customer_name_input.clear()
+
+    def load_customer_data_home(self):
+        try:
+            load_customers(self.customer_table)
+            # Formattazione della colonna "Totale"
+            for row in range(self.customer_table.rowCount()):
+                customer_item = self.customer_table.item(row, 0)
+                total_item = self.customer_table.item(row, 1)
+                if total_item:
+                    total_value = float(total_item.text())
+                    if total_value < 0:
+                        total_item.setFont(QFont("", 16, QFont.Weight.Bold))
+                        total_item.setBackground(QBrush(Qt.GlobalColor.red))
+                        total_item.setFlags(~Qt.ItemFlag.ItemIsEditable)
+                    else:
+                        total_item.setFont(QFont("", 16, QFont.Weight.Bold))
+                        total_item.setBackground(QBrush(Qt.GlobalColor.white))
+                        total_item.setFlags(~Qt.ItemFlag.ItemIsEditable)
+                if customer_item:
+                    customer_item.setFlags(~Qt.ItemFlag.ItemIsEditable)
+        except Exception as e:
+            print("Errore durante il caricamento dei dati dei clienti:", str(e))
+
     def on_customer_click(self, row, column):
         customer_name = self.customer_table.item(row, column).text()
         self.customer_name_input.setText(customer_name)
 
     def resizeEvent(self, event):
         self.image_label.setGeometry(0, 0, self.width(), self.height())
+
+    def filter_customers(self):
+        filter_text = self.customer_name_input.text().strip().lower()
+        for row in range(self.customer_table.rowCount()):
+            customer_name_item = self.customer_table.item(row, 0)
+            if customer_name_item:
+                customer_name = customer_name_item.text().lower()
+                if customer_name.startswith(filter_text):
+                    self.customer_table.setRowHidden(row, False)
+                else:
+                    self.customer_table.setRowHidden(row, True)
 
     def search_customer(self):
         customer_name = self.customer_name_input.text().strip()
