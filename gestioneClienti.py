@@ -644,15 +644,18 @@ class HomePage(QWidget):
         self.customer_table = QTableWidget()
         self.customer_table.setColumnCount(2)
         self.customer_table.setHorizontalHeaderLabels(["Nome Cliente", "Totale"])
-        
+
+        # Nascondi la colonna dei numeri di riga
+        self.customer_table.verticalHeader().setVisible(False)
+
         # Imposta la larghezza della prima colonna
         self.customer_table.setColumnWidth(0, 200)
-        
+
         # Impostare le intestazioni in grassetto
         header = self.customer_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        
+
         # Imposta il font in grassetto per le intestazioni
         font = QFont()
         font.setBold(True)
@@ -702,6 +705,7 @@ class HomePage(QWidget):
                 total_item = self.customer_table.item(row, 1)
                 if total_item:
                     total_value = float(total_item.text())
+                    total_item.setText(f"€ {total_value:,.2f}")
                     if total_value < 0:
                         total_item.setFont(QFont("", 16, QFont.Weight.Bold))
                         total_item.setBackground(QBrush(Qt.GlobalColor.red))
